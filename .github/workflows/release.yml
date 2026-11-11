@@ -38,7 +38,10 @@ jobs:
           sudo apt-get install -y -q debootstrap squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin mtools
 
       - name: Build the ISO
-        run: sudo ./os/build.sh
+        run: |
+          sudo ./os/build.sh
+          # the build runs as root; let the next steps (normal user) write next to the ISO
+          sudo chown "$(id -u):$(id -g)" os/out os/out/rocketos.iso
 
       - name: Check size and write checksum
         working-directory: os/out
