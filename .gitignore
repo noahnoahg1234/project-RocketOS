@@ -1,0 +1,3 @@
+os/out/
+__pycache__/
+*.pyc

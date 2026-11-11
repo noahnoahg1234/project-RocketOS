@@ -20,11 +20,11 @@ const VFS = (() => {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       try { localStorage.setItem(KEY, JSON.stringify(root)); }
-      catch (e) { console.warn('VFS save failed (storage full?)', e); if (window.OS) OS.notify('Storage', 'Disk is full — could not save files.', '⚠️'); }
+      catch (e) { console.warn('VFS save failed (storage full?)', e); if (typeof OS !== 'undefined') OS.notify('Storage', 'Disk is full — could not save files.', '⚠️'); }
     }, 150);
   }
 
-  function home() { return '/home/' + ((window.OS && OS.settings && OS.settings.username) || 'user'); }
+  function home() { return '/home/' + ((typeof OS !== 'undefined' && OS.settings && OS.settings.username) || 'user'); }
 
   function normalize(path, cwd = '/') {
     if (path == null || path === '') path = '.';

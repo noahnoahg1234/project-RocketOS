@@ -1,0 +1,14 @@
+[Unit]
+Description=RocketOS system daemon (desktop server + hardware bridge)
+After=network.target NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/lib/rocketos/rocketd.py
+Restart=always
+RestartSec=1
+RuntimeDirectory=rocketos
+RuntimeDirectoryPreserve=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -202,7 +202,7 @@ const Desktop = (() => {
       { icon: '🛍️', label: 'App Store…', action: () => OS.launch('store') },
       '-', { icon: '🔒', label: 'Lock Screen', hint: '', action: () => Boot.lock() },
       { icon: '🔄', label: 'Restart…', action: () => Boot.power('restart') },
-      { icon: '⏻', label: 'Shut Down…', action: () => Boot.power('shutdown') }]); });
+      { icon: '🔌', label: 'Shut Down…', action: () => Boot.power('shutdown') }]); });
     menus.append(
       mk('File', () => [
         { icon: '🪟', label: 'New Window', action: () => { const f = WM.focused; f && f.appId && OS.getApp(f.appId) ? OS.launch(f.appId) : OS.launch('files'); } },
@@ -400,7 +400,7 @@ const Desktop = (() => {
       { icon: '🤖', label: 'Rocky AI', big: true, action: () => OS.launch('rocky') },
       '-',
       { icon: '🔒', label: `Log Off ${OS.settings.username}…`, big: true, action: () => Boot.lock() },
-      { icon: '⏻', label: 'Shut Down…', big: true, action: () => Boot.power() },
+      { icon: '🔌', label: 'Shut Down…', big: true, action: () => Boot.power() },
     ];
     const banner = h('div', { class: 'sm-banner' }, h('span', {}, h('b', {}, 'Rocket'), 'OS ', h('small', {}, OS.version)));
     sm.append(banner, buildMenuList(items, true));
@@ -520,7 +520,7 @@ const Desktop = (() => {
         tile('🦷', 'Bluetooth', S.bt, () => OS.set('bt', !S.bt)),
         tile('✈️', 'Airplane', S.airplane, () => { OS.set('airplane', !S.airplane); NET.setEnabled(!S.airplane); })),
       h('div', { class: 'cc-sl' }, '☀️', bright), h('div', { class: 'cc-sl' }, '🔊', vol),
-      h('div', { class: 'cc-foot' }, h('button', { class: 'btn sm', onclick: () => { closePopup(); OS.launch('settings'); } }, '⚙️ Settings'), h('button', { class: 'btn sm', onclick: () => { closePopup(); Boot.power(); } }, '⏻ Power')));
+      h('div', { class: 'cc-foot' }, h('button', { class: 'btn sm', onclick: () => { closePopup(); OS.launch('settings'); } }, '⚙️ Settings'), h('button', { class: 'btn sm', onclick: () => { closePopup(); Boot.power(); } }, '🔌 Power')));
     popup(anchor, box, { from: 'top' });
   }
 
@@ -564,7 +564,7 @@ const Battery = (() => {
     const upd = () => { text = (b.charging ? '⚡' : b.level < 0.2 ? '🪫' : '🔋') + Math.round(b.level * 100) + '%'; subs.forEach(f => f(text)); };
     upd(); b.addEventListener('levelchange', upd); b.addEventListener('chargingchange', upd);
   }).catch(() => {});
-  return { watch(fn) { subs.push(fn); fn(text); } };
+  return { watch(fn) { subs.push(fn); fn(text); }, set(t) { text = t; subs.forEach(f => f(t)); } };
 })();
 
 /* ---------- Simulated system statistics */

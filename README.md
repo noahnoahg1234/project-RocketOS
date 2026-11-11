@@ -2,7 +2,18 @@
 
 RocketOS is a Unix-style desktop operating system that runs in your web browser. It has a real file tree, a shell with ~90 commands, a window manager and its own file formats for apps, batch scripts and shortcuts.
 
-## Run it
+## Two ways to run it
+
+1. **As a real operating system:** build a bootable ISO that boots a Linux kernel straight into this desktop. Wi-Fi, power and system stats are then real. See **[os/README.md](os/README.md)**:
+   ```bash
+   sudo ./os/build.sh
+   ```
+   ```bash
+   ./os/run-vm.sh
+   ```
+2. **In a web browser:** follow the steps below.
+
+## Run it in a browser
 
 You don't need to build or install anything. Either:
 
@@ -102,5 +113,7 @@ js/widgets.js       desktop widgets + weather service
 js/terminal.js      rsh shell + Terminal app (.log runner)
 js/apps/*.js        system apps, Rocky AI, App Store, App Maker
 js/games/*.js       10 games
+js/native.js        bridge to real hardware when running as the OS
 js/boot.js          BIOS/splash, lock screen, first-run file system
+os/                 bootable OS image build (see os/README.md)
 ```

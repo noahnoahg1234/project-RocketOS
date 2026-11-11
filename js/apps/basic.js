@@ -192,7 +192,7 @@
       win.body.append(h('div', { class: 'about' },
         h('div', { class: 'about-logo' }, '🚀'), h('h2', {}, 'RocketOS'), h('div', { class: 'muted' }, `Version ${OS.version} “Liftoff”`),
         h('div', { class: 'about-grid' },
-          h('b', {}, 'Kernel'), h('span', {}, 'rocket-kernel 1.0 (Unix-like)'), h('b', {}, 'Shell'), h('span', {}, 'rsh 2.0'),
+          h('b', {}, 'Kernel'), h('span', {}, OS.kernel || 'rocket-kernel 1.0 (Unix-like)'), h('b', {}, 'Shell'), h('span', {}, 'rsh 2.0'),
           h('b', {}, 'User'), h('span', {}, OS.settings.username + '@' + OS.settings.hostname), h('b', {}, 'Memory'), h('span', {}, `${m.used} / ${m.total} MB`),
           h('b', {}, 'Storage'), h('span', {}, OS.fmtSize(VFS.usage()) + ' used'), h('b', {}, 'Apps'), h('span', {}, OS.listApps().length + ' installed'),
           h('b', {}, 'Formats'), h('span', {}, '.esl apps · .log batch · .hsl shortcuts')),

@@ -97,7 +97,7 @@ echo Done!
     const err = h('div', { class: 'lock-err' });
     const btn = h('button', { class: 'btn primary lock-go' }, OS.settings.password ? '→' : 'Log in');
     const form = h('div', { class: 'lock-form' }, h('div', { class: 'avatar xl' }, OS.settings.avatar || '🧑‍🚀'), h('div', { class: 'lock-user' }, OS.settings.username), h('div', { class: 'row center' }, OS.settings.password ? pw : '', btn), err, OS.settings.password ? '' : h('small', { class: 'muted' }, 'Tip: set a password in Settings → Users'));
-    el.append(bg, h('div', { class: 'lock-top' }, clock, date), form, h('div', { class: 'lock-foot' }, h('button', { class: 'btn sm', onclick: () => power('shutdown', true) }, '⏻'), h('button', { class: 'btn sm', onclick: () => location.reload() }, '🔄')));
+    el.append(bg, h('div', { class: 'lock-top' }, clock, date), form, h('div', { class: 'lock-foot' }, h('button', { class: 'btn sm', onclick: () => power('shutdown', true) }, '🔌'), h('button', { class: 'btn sm', onclick: () => location.reload() }, '🔄')));
     const tick = () => { const d = new Date(); clock.textContent = OS.fmtTime(d, false); date.textContent = d.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }); };
     tick(); const iv = setInterval(tick, 1000);
     const go = () => {
@@ -128,7 +128,7 @@ echo Done!
 
   async function power(mode, noAsk) {
     if (!mode || !noAsk) {
-      const b = await OS.dialog({ title: 'Shut Down RocketOS', icon: '⏻', message: 'What do you want the computer to do?', buttons: mode === 'restart' ? ['Restart', 'Shut down', 'Cancel'] : ['Shut down', 'Restart', 'Lock', 'Cancel'] });
+      const b = await OS.dialog({ title: 'Shut Down RocketOS', icon: '🔌', message: 'What do you want the computer to do?', buttons: mode === 'restart' ? ['Restart', 'Shut down', 'Cancel'] : ['Shut down', 'Restart', 'Lock', 'Cancel'] });
       if (b === 'Cancel' || !b) return;
       if (b === 'Lock') return lock();
       mode = b === 'Restart' ? 'restart' : 'shutdown';
@@ -140,9 +140,10 @@ echo Done!
     const el = $('#boot'); el.className = ''; el.innerHTML = '';
     el.append(h('div', { class: 'splash' }, h('div', { class: 'splash-logo' }, '🚀'), h('div', { class: 'splash-msg' }, mode === 'restart' ? 'Restarting…' : 'Shutting down…')));
     setTimeout(() => {
+      if (typeof Native !== 'undefined' && Native.on) return Native.power(mode); // real power-off / reboot
       if (mode === 'restart') return location.reload();
       el.innerHTML = '';
-      el.append(h('div', { class: 'safe-off' }, h('div', {}, 'It is now safe to turn off your computer.'), h('button', { class: 'btn', onclick: () => location.reload() }, '⏻ Power on')));
+      el.append(h('div', { class: 'safe-off' }, h('div', {}, 'It is now safe to turn off your computer.'), h('button', { class: 'btn', onclick: () => location.reload() }, '🔌 Power on')));
       $('#os').classList.add('hidden');
     }, 1300);
   }

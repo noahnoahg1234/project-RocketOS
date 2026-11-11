@@ -269,7 +269,7 @@ const Shell = (() => {
         'Text': 'echo printf grep sort uniq wc rev tr cut sed nl base64 seq',
         'System': 'ps top kill free uname uptime whoami hostname date cal env export unset alias unalias history which type clear sleep reboot shutdown lock theme wallpaper notify neofetch',
         'Network': 'wifi ping ifconfig curl nslookup',
-        'RocketOS': 'open edit run source apps install uninstall store esl hsl ai calc games test true false exit',
+        'RocketOS': 'open edit run source apps install uninstall store esl hsl ai calc games test true false exit' + (OS.native ? ' linux poweroff' : ''),
         'Fun': 'cowsay fortune matrix banner lolcat yes',
       };
       ctx.out(`${C.orange}${C.bold}rsh — RocketOS shell${C.reset}  (type ${C.cyan}man <cmd>${C.reset} for details)\n\n`);
@@ -346,7 +346,7 @@ const Shell = (() => {
       while (!ctx.sh.aborted) { term.clear(); const m = SysStats.mem(); ctx.out(`${C.bold}top - ${new Date().toLocaleTimeString()} up ${fmtUp(OS.bootTime)}, ${OS.procs.length + 2} tasks${C.reset}\n%Cpu: ${SysStats.cpu().toFixed(1)}   Mem: ${m.used}/${m.total} MB\n\n`); await CMDS.ps.fn(ctx); ctx.out(`\n${C.gray}Press Ctrl+C to exit${C.reset}\n`); await sleep(1000); } } },
     kill: { help: 'Kill a process by PID', usage: 'kill PID', fn: ctx => { needArg(ctx); ctx.args.forEach(p => { if (!OS.killProc(p.replace(/^-9$/, ''))) { if (p !== '-9') ctx.err(`kill: (${p}) - No such process\n`); } else ctx.out(`Killed ${p}\n`); }); } },
     free: { help: 'Memory usage', fn: ctx => { const m = SysStats.mem(); ctx.out(`              total        used        free\nMem:   ${String(m.total).padStart(12)}${String(m.used).padStart(12)}${String(m.total - m.used).padStart(12)}\n`); } },
-    uname: { help: 'System info', usage: 'uname [-a]', fn: ctx => ctx.out(flags(ctx.args).f.a ? `RocketOS ${OS.settings.hostname} ${OS.version} rocket-kernel-1.0 #1 SMP ${navigator.platform || 'web'} rsh\n` : 'RocketOS\n') },
+    uname: { help: 'System info', usage: 'uname [-a]', fn: ctx => ctx.out(flags(ctx.args).f.a ? `RocketOS ${OS.settings.hostname} ${OS.version} ${OS.kernel || 'rocket-kernel-1.0'} ${navigator.platform || 'web'} rsh\n` : 'RocketOS\n') },
     uptime: { help: 'Time since boot', fn: ctx => ctx.out(`up ${fmtUp(OS.bootTime)}, 1 user, load average: ${(SysStats.cpu() / 100).toFixed(2)}\n`) },
     whoami: { help: 'Current user', fn: ctx => ctx.out(OS.settings.username + '\n') },
     hostname: { help: 'Host name', fn: ctx => { if (ctx.args[0]) { OS.set('hostname', ctx.args[0]); ctx.sh.env.HOSTNAME = ctx.args[0]; } ctx.out(OS.settings.hostname + '\n'); } },
@@ -382,7 +382,7 @@ const Shell = (() => {
     neofetch: { help: 'System summary', fn: ctx => {
       const m = SysStats.mem(), o = C.orange + C.bold, r = C.reset;
       const art = ['        /\\        ', '       /  \\       ', '      | () |      ', '      |    |      ', '     /| RO |\\     ', '    / |    | \\    ', '   /__|____|__\\   ', '      /_||_\\      ', '      ( ** )      ', '       \\  /       '];
-      const info = [`${o}${OS.settings.username}@${OS.settings.hostname}${r}`, '─'.repeat(18), `${o}OS:${r} RocketOS ${OS.version}`, `${o}Kernel:${r} rocket-kernel 1.0 (unix-like)`, `${o}Uptime:${r} ${fmtUp(OS.bootTime)}`, `${o}Shell:${r} rsh 2.0`, `${o}WM:${r} RocketWM`, `${o}Terminal:${r} Rocket Terminal`, `${o}Memory:${r} ${m.used}MiB / ${m.total}MiB`, `${o}Wi-Fi:${r} ${NET.status().text}`];
+      const info = [`${o}${OS.settings.username}@${OS.settings.hostname}${r}`, '─'.repeat(18), `${o}OS:${r} RocketOS ${OS.version}`, `${o}Kernel:${r} ${OS.kernel || 'rocket-kernel 1.0 (unix-like)'}`, `${o}Uptime:${r} ${fmtUp(OS.bootTime)}`, `${o}Shell:${r} rsh 2.0`, `${o}WM:${r} RocketWM`, `${o}Terminal:${r} Rocket Terminal`, `${o}Memory:${r} ${m.used}MiB / ${m.total}MiB`, `${o}Wi-Fi:${r} ${NET.status().text}`];
       art.forEach((a, i) => ctx.out(`${o}${a}${r}  ${info[i] || ''}\n`));
       ctx.out('\n' + [41, 42, 43, 44, 45, 46, 47].map(c => `\x1b[${c}m   `).join('') + C.reset + '\n');
     } },
@@ -536,9 +536,14 @@ OS.registerApp({ id: 'terminal', name: 'Terminal', icon: '💻', category: 'Syst
       const showPrompt = () => { promptEl.innerHTML = ansiToHtml(sh.prompt()); line.style.display = ''; input.focus(); pane.scrollTop = pane.scrollHeight; label.textContent = VFS.basename(sh.cwd) || '/'; };
       async function execute(cmd, echo = true) {
         if (echo) write(sh.prompt() + cmd + '\n');
-        busy = true; line.style.display = 'none'; sh.aborted = false;
+        busy = true; line.style.display = 'none'; sh.aborted = false; if (document.activeElement === input) pane.focus();
         try { await sh.run(cmd); } catch (e) { write(`\x1b[31m${e.message}\x1b[0m\n`); }
         busy = false; sh.aborted = false; showPrompt();
+        if (typeahead) {
+          const nl = typeahead.indexOf('\n');
+          if (nl < 0) { input.value = typeahead; typeahead = ''; }
+          else { const next = typeahead.slice(0, nl); typeahead = typeahead.slice(nl + 1); input.value = ''; sh.addHistory(next); execute(next); }
+        }
       }
       tab.execute = execute;
       input.addEventListener('keydown', async e => {
@@ -559,7 +564,16 @@ OS.registerApp({ id: 'terminal', name: 'Terminal', icon: '💻', category: 'Syst
         else if (e.key === 'l' && e.ctrlKey) { e.preventDefault(); out.innerHTML = ''; }
         else if (e.key === 'c' && e.ctrlKey && input.selectionStart === input.selectionEnd) { write(sh.prompt() + input.value + '^C\n'); input.value = ''; }
       });
-      pane.addEventListener('keydown', e => { if (busy && e.key === 'c' && e.ctrlKey) { sh.aborted = true; write('^C\n'); } });
+      // type-ahead: keys pressed while a command runs are kept and replayed at the next prompt
+      let typeahead = '';
+      pane.addEventListener('keydown', e => {
+        if (!busy || readResolve || e.target === input) return;
+        if (e.key === 'c' && e.ctrlKey) { sh.aborted = true; typeahead = ''; write('^C\n'); return; }
+        if (e.ctrlKey || e.altKey || e.metaKey) return;
+        if (e.key.length === 1) { typeahead += e.key; e.preventDefault(); }
+        else if (e.key === 'Enter') { typeahead += '\n'; e.preventDefault(); }
+        else if (e.key === 'Backspace') { typeahead = typeahead.slice(0, -1); e.preventDefault(); }
+      });
       pane.tabIndex = 0;
       pane.addEventListener('mouseup', () => { if (!getSelection().toString()) (line.style.display === 'none' ? pane : input).focus(); });
       tabs.push(tab); activate(tab);
