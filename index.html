@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RocketOS</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚀</text></svg>">
+<link rel="stylesheet" href="css/os.css">
+</head>
+<body>
+<div id="boot"></div>
+<div id="lock" class="hidden"></div>
+<div id="os" class="hidden">
+  <div id="topbar"></div>
+  <div id="desktop">
+    <div id="wallpaper"></div>
+    <div id="desktop-icons"></div>
+    <div id="widgets"></div>
+    <div id="windows"></div>
+  </div>
+  <div id="taskbar"></div>
+  <div id="startmenu" class="hidden"></div>
+  <div id="popups"></div>
+  <div id="toasts"></div>
+</div>
+
+<!-- core -->
+<script src="js/fs.js"></script>
+<script src="js/core.js"></script>
+<script src="js/net.js"></script>
+<script src="js/wm.js"></script>
+<script src="js/formats.js"></script>
+<script src="js/shell.js"></script>
+<script src="js/widgets.js"></script>
+<script src="js/terminal.js"></script>
+<!-- apps -->
+<script src="js/apps/files.js"></script>
+<script src="js/apps/editor.js"></script>
+<script src="js/apps/basic.js"></script>
+<script src="js/apps/media.js"></script>
+<script src="js/apps/settings.js"></script>
+<script src="js/apps/browser.js"></script>
+<script src="js/apps/ai.js"></script>
+<script src="js/apps/store.js"></script>
+<script src="js/apps/appmaker.js"></script>
+<!-- games -->
+<script src="js/games/arcade.js"></script>
+<script src="js/games/puzzle.js"></script>
+<!-- boot -->
+<script src="js/boot.js"></script>
+</body>
+</html>
