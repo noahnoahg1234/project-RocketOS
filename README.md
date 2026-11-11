@@ -1,10 +1,22 @@
+<div align="center">
+
 # 🚀 RocketOS
 
-RocketOS is a Unix-style desktop operating system that runs in your web browser. It has a real file tree, a shell with ~90 commands, a window manager and its own file formats for apps, batch scripts and shortcuts.
+**A Unix-style desktop operating system — boot it on a PC, or run it in your browser.**
+
+<a href="https://github.com/noahnoahg1234/project-RocketOS/releases/latest/download/rocketos.iso"><img alt="Download RocketOS (.iso)" src="https://img.shields.io/badge/%E2%AC%87%EF%B8%8F%20Download-RocketOS%20.iso-ff6b35?style=for-the-badge&logo=linux&logoColor=white" height="44"></a>
+&nbsp;
+<a href="https://github.com/noahnoahg1234/project-RocketOS/releases"><img alt="All releases" src="https://img.shields.io/badge/All%20releases-2b3042?style=for-the-badge&logo=github" height="44"></a>
+
+<sub>Bootable image for 64-bit PCs (BIOS &amp; UEFI) and virtual machines · write it to a USB stick with <a href="https://etcher.balena.io/">balenaEtcher</a> or Rufus · <a href="os/README.md">how to install</a></sub>
+
+</div>
+
+RocketOS has a real file tree, a shell with ~90 commands, a window manager, a real web browser, an App Maker for HTML/JS, C, C++, Python, Rust, Go, Java and more, and its own file formats for apps, batch scripts and shortcuts.
 
 ## Two ways to run it
 
-1. **As a real operating system:** build a bootable ISO that boots a Linux kernel straight into this desktop. Wi-Fi, power and system stats are then real. See **[os/README.md](os/README.md)**:
+1. **As a real operating system:** press **Download** above, or build the bootable ISO yourself. It boots a Linux kernel straight into this desktop; Wi-Fi, power, system stats, the web browser and native programming languages are then real. See **[os/README.md](os/README.md)**:
    ```bash
    sudo ./os/build.sh
    ```
@@ -40,11 +52,11 @@ Everything you create (files, settings, installed and published apps) is saved i
 | **Widgets** | Analog clock, calendar, weather, system monitor, sticky note, to-do. You can drag them, and their positions are saved |
 | **Wi-Fi** | Network list with signal strength and security, password prompts, saved networks, turn Wi-Fi on/off, airplane mode, and `wifi` / `ifconfig` / `ping` in the terminal. It also reports whether the device itself is online |
 | **Rocky AI** | Built-in assistant. It can open apps, change settings, run commands, do maths, set reminders and create notes. Optional **Cloud mode** uses Claude through the Anthropic SDK when you add an API key |
-| **Apps** | Files, Terminal, Rocket Write (editor), Calculator (scientific), Clock (world / stopwatch / timer / alarms), Calendar, Notes, Paint, Rocket Tunes (piano, drums, songs), Rocket Browser (tabs and bookmarks), Weather, System Monitor, Settings, Guide, About, Image Viewer |
+| **Apps** | Files, Terminal, Rocket Write (editor), Calculator (scientific), Clock (world / stopwatch / timer / alarms), Calendar, Notes, Paint, Rocket Tunes (piano, drums, songs), Rocket Browser (tabs and bookmarks; a full web engine in the OS version), Weather, System Monitor, Settings, Guide, About, Image Viewer |
 | **10 games** | Snake, Block Drop, Paddle Duel, Brick Smash, Rocket Hop, Star Blaster, Mine Field, Doubler, Tic-Tac-Toe (with an unbeatable AI), Memory Match |
 | **App Store** | Featured apps, categories, search, ratings, download counts, install and uninstall. Store apps are installed to `/apps/store` |
 | **Publish apps** | App Maker → **🚀 Publish** (or upload a `.esl` file). Published apps show up under **Community** |
-| **App Maker** | Edit the HTML, CSS and JS of an `.esl` app with a live preview and console. Includes templates, drag-in components and code snippets. You can save, run, export, add a desktop shortcut or publish |
+| **App Maker** | Edit the HTML, CSS and JS of an `.esl` app with a live preview and console. Includes templates, drag-in components and code snippets. You can save, run, export, add a desktop shortcut or publish. **In the OS version** you can also write apps in **C, C++, Python, Rust, Go, JavaScript (Node.js), Ruby, Lua, Java and Bash**: they compile and run on the real machine in an interactive output terminal, and save and publish as `.esl` apps like any other |
 
 ## File formats
 
@@ -63,7 +75,9 @@ body { text-align: center; padding: 20px }
 ---js
 b.onclick = () => os.notify('Hi', 'From my app');
 ```
-Apps run in a sandboxed iframe and get an `os` API:
+Native apps (OS version) use `runtime: c` (or `cpp`, `python`, `rust`, `go`, `javascript`, `ruby`, `lua`, `java`, `bash`) and a single `---code` section instead of the HTML/CSS/JS sections.
+
+Web apps run in a sandboxed iframe and get an `os` API:
 - `os.notify`, `os.alert`, `os.prompt`
 - `os.fs.read`, `os.fs.write`, `os.fs.list`, `os.fs.exists`, `os.fs.mkdir`, `os.fs.remove`
 - `os.storage.get`, `os.storage.set`

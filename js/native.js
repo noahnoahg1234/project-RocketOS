@@ -93,6 +93,55 @@ const Native = (() => {
     catch (e) { OS.alert('Could not ' + mode + ': ' + e.message, 'Power', '⚠️'); }
   }
 
+  // ------------------------------------------------------------ real browser views (provided by rocket-shell)
+  const features = cfg.features || [];
+  const handler = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.rocket;
+  const browserListeners = {};
+  const browser = features.includes('browser') && handler ? {
+    post: msg => handler.postMessage(JSON.stringify(msg)),
+    on: (id, fn) => { browserListeners[id] = fn; },
+    off: id => { delete browserListeners[id]; },
+  } : null;
+  window.__rocketNative = {
+    event(ev) {
+      if (ev.type === 'download') {
+        if (ev.error) OS.notify('Download failed', ev.error, '⚠️');
+        else OS.notify('Download complete', ev.path.split('/').pop() + ' saved to ~/Downloads (Linux)', '📥');
+        return;
+      }
+      const fn = browserListeners[ev.id]; if (fn) fn(ev);
+    },
+  };
+
+  // ------------------------------------------------------------ programs in C, Python, Rust… (App Maker / .esl runtime)
+  let langCache = null;
+  const programs = {
+    langs: async () => langCache || (langCache = await api('langs')),
+    /** Start a program. Returns {id, poll(onOutput) -> Promise<exitCode>, write(text), kill()} */
+    async start(lang, code) {
+      const r = await fetch('/api/proc/start', { method: 'POST', headers: { 'X-Rocket-Token': cfg.token, 'Content-Type': 'application/json' }, body: JSON.stringify({ lang, code }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'could not start');
+      let since = 0, stopped = false;
+      return {
+        id: j.id,
+        async poll(onOutput) {
+          while (!stopped) {
+            const st = await api(`proc/read?id=${j.id}&since=${since}`);
+            if (st.out) onOutput(st.out.replace(/\r\n/g, '\n'));
+            since = st.next;
+            if (st.done) return st.code;
+            await new Promise(res => setTimeout(res, st.out ? 30 : 120));
+          }
+          return null;
+        },
+        write: text => api('proc/write', { id: j.id, data: text }).catch(() => {}),
+        kill: () => { api('proc/kill', { id: j.id }).catch(() => {}); },
+        stop: () => { stopped = true; },
+      };
+    },
+  };
+
   async function init() {
     try {
       const p = await api('ping');
@@ -108,5 +157,5 @@ const Native = (() => {
     } catch (e) { console.warn('RocketOS native bridge unavailable:', e); }
   }
   init();
-  return { get on() { return state.on; }, state, api, power };
+  return { get on() { return state.on; }, state, api, power, browser, programs };
 })();

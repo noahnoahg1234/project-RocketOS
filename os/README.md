@@ -31,9 +31,18 @@ Boot sequence: GRUB → Linux + casper live system → systemd starts `rocketd` 
 | Volume slider | Sound effects only | Also sets the **system** volume (ALSA) |
 | `uname -a`, `neofetch`, About | `rocket-kernel` | The **real Linux kernel** version |
 | `linux <cmd>` in the Terminal | — | Runs a **real Linux command** as user `rocket`, e.g. `linux ip addr`, `linux lsusb`, `linux sudo apt install …` |
-| Browser, live weather, Rocky's cloud mode | Need internet | Work over the machine's own connection |
+| Rocket Browser | iframes: many big sites refuse to load | **Real browser views** (WebKit) placed inside the window: every site works, with its own cookies, zoom, new-tab links and downloads to `~/Downloads` |
+| App Maker | HTML/CSS/JS apps | Also **C, C++, Python, Rust, Go, JavaScript (Node.js), Ruby, Lua, Java, Bash**: compiled and run on the machine (as user `rocket`) with an interactive output terminal |
+| Live weather, Rocky's cloud mode | Need internet | Work over the machine's own connection |
 
 `js/native.js` only switches on when `rocket-shell` injects the API token, so the web version behaves exactly as before.
+
+## Download
+
+The easiest way is the **Download** button on the [project page](../README.md). It gets the latest `rocketos.iso` from the [Releases](https://github.com/noahnoahg1234/project-RocketOS/releases). The `.github/workflows/release.yml` workflow builds and publishes the ISO automatically when:
+- a version tag is pushed (`git tag v1.1.0 && git push --tags`),
+- RocketOS code changes on `main`, or
+- someone runs it from the **Actions** tab ("Build & release RocketOS ISO" → **Run workflow**).
 
 ## Build the ISO
 
@@ -50,6 +59,7 @@ sudo ./os/build.sh
 The result is `os/out/rocketos.iso`. The build takes a few minutes and needs about 6 GB of free disk space.
 
 - `VARIANT=vm`: a smaller image without Wi-Fi firmware, for virtual machines only.
+- `LANGS=0`: leave out the App Maker compilers (C, C++, Rust, Go, Java, Node.js, Ruby, Lua), which saves several hundred MB.
 - `MIRROR=http://…`: use a different Ubuntu mirror.
 - If you re-run the build, it reuses `os/out/rootfs` and copies the latest desktop code. Delete `os/out` to start completely fresh.
 
@@ -87,8 +97,8 @@ os/build.sh                         builds the ISO
 os/run-vm.sh                        boots it in QEMU
 os/iso/boot/grub/grub.cfg           boot menu
 os/rootfs/                          copied into the system image:
-  usr/lib/rocketos/rocketd.py       system daemon: desktop server + hardware API
-  usr/lib/rocketos/rocket-shell.py  fullscreen WebKit display
+  usr/lib/rocketos/rocketd.py       system daemon: desktop server, hardware API, program runner
+  usr/lib/rocketos/rocket-shell.py  fullscreen WebKit display + real browser views
   usr/bin/rocketos-session          X session start-up
   etc/systemd/system/…              rocketd service, tty1 auto-login
   etc/skel/.bash_profile            starts the desktop on tty1

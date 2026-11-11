@@ -21,13 +21,16 @@ const ESL = (() => {
    *   h1 { color: orange }
    *   ---js
    *   os.notify('Hi', 'from my app');
+   *
+   * Native apps (OS version only) instead set `runtime: c|cpp|python|rust|go|javascript|ruby|lua|java|bash`
+   * and put their source in a `---code` section. They run in an interactive terminal window.
    */
   function parse(text) {
-    const meta = {}, sections = { html: '', css: '', js: '' };
+    const meta = {}, sections = { html: '', css: '', js: '', code: '' };
     const lines = String(text).replace(/\r/g, '').split('\n');
     let cur = null;
     for (const line of lines) {
-      const m = line.match(/^---(html|css|js)\s*$/);
+      const m = line.match(/^---(html|css|js|code)\s*$/);
       if (m) { cur = m[1]; continue; }
       if (cur) { sections[cur] += line + '\n'; continue; }
       if (line.startsWith('#')) continue;
@@ -37,15 +40,19 @@ const ESL = (() => {
     meta.name = meta.name || 'Untitled App';
     meta.icon = meta.icon || '📦';
     meta.width = +meta.width || 480; meta.height = +meta.height || 360;
-    return { meta, html: sections.html.trimEnd(), css: sections.css.trimEnd(), js: sections.js.trimEnd() };
+    meta.runtime = (meta.runtime || 'web').toLowerCase();
+    return { meta, html: sections.html.trimEnd(), css: sections.css.trimEnd(), js: sections.js.trimEnd(), code: sections.code.trimEnd() };
   }
+  const isNative = meta => !!meta.runtime && meta.runtime !== 'web';
 
-  function serialize({ meta = {}, html = '', css = '', js = '' }) {
-    const order = ['name', 'icon', 'version', 'author', 'category', 'description', 'width', 'height', 'builtin'];
+  function serialize({ meta = {}, html = '', css = '', js = '', code = '' }) {
+    const order = ['name', 'icon', 'version', 'author', 'category', 'description', 'runtime', 'width', 'height', 'builtin'];
+    meta = Object.assign({}, meta); if (meta.runtime === 'web') delete meta.runtime;
     let out = '#!esl\n';
     const keys = [...order.filter(k => meta[k] != null && meta[k] !== ''), ...Object.keys(meta).filter(k => !order.includes(k) && meta[k] != null && meta[k] !== '')];
     for (const k of keys) out += `${k}: ${String(meta[k]).replace(/\n/g, ' ')}\n`;
     if (meta.builtin) return out;
+    if (isNative(meta)) return out + `---code\n${code}\n`;
     return out + `---html\n${html}\n---css\n${css}\n---js\n${js}\n`;
   }
 
@@ -125,6 +132,7 @@ ${app.css || ''}</style></head><body>${app.html || ''}
   function runText(text, path) {
     const app = parse(text);
     if (app.meta.builtin) return OS.launch(app.meta.builtin.trim(), { path });
+    if (isNative(app.meta)) return Programs.open({ name: app.meta.name, icon: app.meta.icon, lang: app.meta.runtime, code: app.code });
     const win = WM.create({ title: app.meta.name, icon: app.meta.icon, width: app.meta.width, height: app.meta.height + 34, appId: 'esl:' + (path || app.meta.name) });
     const frame = OS.h('iframe', { class: 'esl-frame', sandbox: 'allow-scripts allow-modals allow-pointer-lock', srcdoc: buildDoc(app) });
     win.body.append(frame);
@@ -139,7 +147,74 @@ ${app.css || ''}</style></head><body>${app.html || ''}
   }
   function run(path) { return runText(VFS.read(path), path); }
 
-  return { parse, serialize, buildDoc, run, runText };
+  return { parse, serialize, buildDoc, run, runText, isNative };
+})();
+
+/* Native programs (C, Python, Rust, …): run on the real machine through rocketd, in a terminal-style window. */
+const Programs = (() => {
+  const LANGS = {
+    c: { name: 'C', ext: 'c', icon: '⚙️' }, cpp: { name: 'C++', ext: 'cpp', icon: '➕' }, python: { name: 'Python', ext: 'py', icon: '🐍' },
+    rust: { name: 'Rust', ext: 'rs', icon: '🦀' }, go: { name: 'Go', ext: 'go', icon: '🐹' }, javascript: { name: 'JavaScript (Node.js)', ext: 'js', icon: '🟨' },
+    ruby: { name: 'Ruby', ext: 'rb', icon: '💎' }, lua: { name: 'Lua', ext: 'lua', icon: '🌙' }, java: { name: 'Java', ext: 'java', icon: '☕' }, bash: { name: 'Bash', ext: 'sh', icon: '🐚' },
+  };
+  const available = () => typeof Native !== 'undefined' && Native.on && !!Native.programs;
+
+  /** Attach a runnable terminal to `outEl` + `inputEl`. Returns {run(lang, code), stop(), running}. */
+  function console_(outEl, inputEl, opts = {}) {
+    let proc = null;
+    const write = (t, cls) => {
+      const span = document.createElement('span');
+      if (cls) span.className = cls;
+      span.innerHTML = typeof ansiToHtml === 'function' ? ansiToHtml(t) : OS.esc(t);
+      outEl.append(span); outEl.scrollTop = outEl.scrollHeight;
+    };
+    inputEl.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && proc) { const v = inputEl.value; inputEl.value = ''; write(v + '\n', 'prog-echo'); proc.write(v + '\n'); }
+      if (e.key === 'c' && e.ctrlKey && proc) { e.preventDefault(); proc.kill(); }
+      if (e.key === 'd' && e.ctrlKey && proc) { e.preventDefault(); proc.write('\x04'); }
+    });
+    const api = {
+      get running() { return !!proc; },
+      write,
+      async run(lang, code) {
+        if (proc) { proc.kill(); proc.stop(); proc = null; }
+        outEl.innerHTML = '';
+        if (!available()) { write(`\x1b[33m${(LANGS[lang] || {}).name || lang} programs run on the RocketOS operating system (the bootable version).\nIn the web version only HTML/CSS/JS apps can run.\x1b[0m\n`); return null; }
+        const L = LANGS[lang] || { name: lang };
+        write(`\x1b[90m▶ ${L.name}: building and running…\x1b[0m\n`);
+        opts.onState && opts.onState(true);
+        const t0 = performance.now();
+        try {
+          proc = await Native.programs.start(lang, code);
+          inputEl.disabled = false; inputEl.focus();
+          const exit = await proc.poll(t => write(t));
+          write(`\n\x1b[90m■ exited with code ${exit} · ${((performance.now() - t0) / 1000).toFixed(1)}s\x1b[0m\n`);
+          return exit;
+        } catch (e) { write(`\x1b[31m${e.message}\x1b[0m\n`); return null; }
+        finally { proc = null; inputEl.disabled = true; opts.onState && opts.onState(false); }
+      },
+      stop() { if (proc) proc.kill(); },
+      dispose() { if (proc) { proc.kill(); proc.stop(); } },
+    };
+    inputEl.disabled = true;
+    return api;
+  }
+
+  /** Open a program window (used for native .esl apps). */
+  function open({ name, icon, lang, code }) {
+    const { h } = OS;
+    const win = WM.create({ title: name, icon: icon || (LANGS[lang] || {}).icon || '⚙️', width: 680, height: 440, appId: 'program:' + name });
+    const out = h('div', { class: 'prog-out' }), input = h('input', { class: 'prog-in', placeholder: 'Type input for the program and press Enter…', spellcheck: 'false' });
+    const runBtn = h('button', { class: 'btn sm primary' }, '⟳ Run again'), stopBtn = h('button', { class: 'btn sm' }, '■ Stop');
+    win.body.append(h('div', { class: 'program' }, h('div', { class: 'prog-bar' }, h('span', { class: 'muted small' }, `${(LANGS[lang] || {}).icon || ''} ${(LANGS[lang] || { name: lang }).name}`), h('div', { class: 'tb-spacer' }), stopBtn, runBtn), out, input));
+    const c = console_(out, input, { onState: r => { stopBtn.disabled = !r; runBtn.disabled = r; } });
+    runBtn.onclick = () => c.run(lang, code); stopBtn.onclick = () => c.stop();
+    win.onClose(() => c.dispose());
+    out.addEventListener('click', () => { if (!input.disabled) input.focus(); });
+    c.run(lang, code);
+    return win;
+  }
+  return { LANGS, available, console: console_, open };
 })();
 
 const HSL = (() => {

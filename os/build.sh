@@ -3,6 +3,7 @@
 #
 #   sudo ./os/build.sh              # full image with real-hardware Wi-Fi drivers and firmware
 #   sudo VARIANT=vm ./os/build.sh   # smaller image for virtual machines (no firmware)
+#   sudo LANGS=0 ./os/build.sh      # leave out the App Maker programming languages (C, Rust, Go, Java…)
 #
 # Result: os/out/rocketos.iso — boots on BIOS and UEFI PCs, from USB or in a VM.
 # Needs (Ubuntu/Debian host): debootstrap squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin mtools
@@ -59,11 +60,15 @@ PKGS=(
   network-manager wpasupplicant iw rfkill wireless-regdb ca-certificates glib-networking
   xserver-xorg-core xserver-xorg-input-libinput xserver-xorg-video-fbdev xserver-xorg-video-vesa xinit x11-xserver-utils
   libgl1-mesa-dri libegl1
-  python3 python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1 dbus dbus-x11 dbus-user-session
+  python3 python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-webkit2-4.1 dbus dbus-x11 dbus-user-session
   fonts-dejavu-core fonts-noto-color-emoji
   gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-alsa alsa-utils
   sudo less nano kbd
 )
+# Programming languages for App Maker (set LANGS=0 for a smaller image without them)
+if [ "${LANGS:-1}" = 1 ]; then
+  PKGS+=(gcc g++ libc6-dev make rustc golang-go nodejs ruby lua5.4 default-jdk-headless)
+fi
 [ "$VARIANT" = vm ] || PKGS+=(linux-firmware)
 in_root apt-get update -q
 in_root apt-get install -y -q --no-install-recommends "${PKGS[@]}"

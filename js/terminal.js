@@ -477,7 +477,9 @@ function ansiToHtml(s) {
   const map = { 30: '#555', 31: '#ff5c57', 32: '#5af78e', 33: '#f3f99d', 34: '#57c7ff', 35: '#ff6ac1', 36: '#9aedfe', 37: '#f1f1f0', 90: '#7a7f8c', 93: '#ffb86c' };
   const bg = { 41: '#ff5c57', 42: '#5af78e', 43: '#f3f99d', 44: '#57c7ff', 45: '#ff6ac1', 46: '#9aedfe', 47: '#f1f1f0' };
   let out = '', open = 0;
-  const parts = String(s).split(/\x1b\[([\d;]*)m/);
+  // drop escape sequences we don't render (cursor movement, clearing, title…), keep colours (…m)
+  s = String(s).replace(/\x1b\[[\d;?]*[A-La-ln-z]/g, '').replace(/\x1b\][^\x07]*\x07/g, '').replace(/\r(?!\n)/g, '');
+  const parts = s.split(/\x1b\[([\d;]*)m/);
   for (let i = 0; i < parts.length; i++) {
     if (i % 2 === 0) { out += OS.esc(parts[i]); continue; }
     const codes = parts[i].split(';').map(Number);

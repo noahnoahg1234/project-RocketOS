@@ -12,8 +12,14 @@ never approves, so other web pages can't drive the API.
 """
 import json
 import os
+import pty
 import secrets
+import shutil
+import signal
 import subprocess
+import tempfile
+import termios
+import threading
 import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
@@ -157,6 +163,117 @@ def sys_state():
             "cpus": os.cpu_count(), "loadavg": os.getloadavg()[0]}
 
 
+# ------------------------------------------------------------------ programs (App Maker native languages)
+# Each language: file name, the tool that must be installed, and the shell command that builds + runs it.
+LANGS = {
+    "c":          {"name": "C",          "file": "main.c",    "needs": "gcc",     "run": "gcc -O2 -Wall -o prog main.c -lm && ./prog"},
+    "cpp":        {"name": "C++",        "file": "main.cpp",  "needs": "g++",     "run": "g++ -O2 -Wall -std=c++20 -o prog main.cpp && ./prog"},
+    "python":     {"name": "Python",     "file": "main.py",   "needs": "python3", "run": "python3 -u main.py"},
+    "rust":       {"name": "Rust",       "file": "main.rs",   "needs": "rustc",   "run": "rustc -O --edition 2021 -o prog main.rs && ./prog"},
+    "go":         {"name": "Go",         "file": "main.go",   "needs": "go",      "run": "go run main.go"},
+    # readline's "terminal" mode redraws the line with cursor codes and echoes input; the UI echoes already.
+    "javascript": {"name": "JavaScript (Node.js)", "file": "main.js", "needs": "node", "run": "node -r ./.rocket-preload.js main.js",
+                   "extra": {".rocket-preload.js": "process.stdout.isTTY = false; process.stdin.isTTY = false;\n"}},
+    "ruby":       {"name": "Ruby",       "file": "main.rb",   "needs": "ruby",    "run": "ruby main.rb"},
+    "lua":        {"name": "Lua",        "file": "main.lua",  "needs": "lua5.4",  "run": "lua5.4 main.lua"},
+    "java":       {"name": "Java",       "file": "Main.java", "needs": "java",    "run": "java Main.java"},
+    "bash":       {"name": "Bash",       "file": "main.sh",   "needs": "bash",    "run": "bash main.sh"},
+}
+
+
+SYS_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+
+def has_tool(name):
+    return bool(shutil.which(name, path=SYS_PATH))
+
+
+def langs():
+    return {k: {"name": v["name"], "file": v["file"], "available": has_tool(v["needs"])} for k, v in LANGS.items()}
+
+
+class Proc:
+    """A program running in a pseudo-terminal, so prompts and colours work like in a real terminal."""
+    MAX_OUT = 2_000_000
+
+    def __init__(self, lang, code):
+        spec = LANGS[lang]
+        self.dir = tempfile.mkdtemp(prefix="rocket-run-")
+        with open(os.path.join(self.dir, spec["file"]), "w") as f:
+            f.write(code)
+        for name, content in spec.get("extra", {}).items():
+            with open(os.path.join(self.dir, name), "w") as f:
+                f.write(content)
+        env = {"PATH": SYS_PATH, "TERM": "xterm-256color",
+               "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8", "PYTHONUNBUFFERED": "1"}
+        cmd = ["bash", "-c", spec["run"]]
+        if os.geteuid() == 0:  # never run user programs as root
+            import pwd
+            pw = pwd.getpwnam(USER)
+            for root, dirs, files in os.walk(self.dir):
+                os.chown(root, pw.pw_uid, pw.pw_gid)
+                for n in files:
+                    os.chown(os.path.join(root, n), pw.pw_uid, pw.pw_gid)
+            env.update(HOME=pw.pw_dir, USER=USER, LOGNAME=USER, GOCACHE=os.path.join(pw.pw_dir, ".cache/go-build"))
+            cmd = ["runuser", "-u", USER, "--"] + cmd
+        else:
+            env.update(HOME=os.environ.get("HOME", self.dir), GOCACHE=os.path.join(self.dir, ".gocache"))
+        master, slave = pty.openpty()
+        attrs = termios.tcgetattr(slave)
+        attrs[3] &= ~termios.ECHO  # the UI shows what you type itself
+        termios.tcsetattr(slave, termios.TCSANOW, attrs)
+        self.p = subprocess.Popen(cmd, stdin=slave, stdout=slave, stderr=slave, cwd=self.dir, env=env, start_new_session=True)
+        os.close(slave)
+        self.master, self.out, self.lock, self.code, self.started = master, b"", threading.Lock(), None, time.time()
+        threading.Thread(target=self._pump, daemon=True).start()
+
+    def _pump(self):
+        while True:
+            try:
+                data = os.read(self.master, 65536)
+            except OSError:
+                data = b""
+            if not data:
+                break
+            with self.lock:
+                self.out = (self.out + data)[-self.MAX_OUT:]
+        self.code = self.p.wait()
+        os.close(self.master)
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def read(self, since):
+        with self.lock:
+            data = self.out[since:] if since <= len(self.out) else b""
+            return {"out": data.decode("utf-8", "replace"), "next": len(self.out), "done": self.code is not None, "code": self.code}
+
+    def write(self, text):
+        if self.code is None:
+            try:
+                os.write(self.master, text.encode())
+            except OSError:
+                pass
+
+    def kill(self):
+        if self.code is None:
+            try:
+                os.killpg(self.p.pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+
+
+PROCS = {}
+
+
+def reap():
+    """Forget finished programs after a while and stop ones that have run for more than 2 hours."""
+    now = time.time()
+    for pid, pr in list(PROCS.items()):
+        if pr.code is None and now - pr.started > 7200:
+            pr.kill()
+        if pr.code is not None and now - pr.started > 600:
+            PROCS.pop(pid, None)
+
+
 # ------------------------------------------------------------------ HTTP
 class Handler(SimpleHTTPRequestHandler):
     server_version = "rocketd/" + VERSION
@@ -211,6 +328,12 @@ class Handler(SimpleHTTPRequestHandler):
             return self.reply(net_state(rescan="rescan=1" in self.path))
         if p == "/api/sys":
             return self.reply(sys_state())
+        if p == "/api/langs":
+            return self.reply(langs())
+        if p == "/api/proc/read":
+            q = dict(kv.split("=", 1) for kv in self.path.partition("?")[2].split("&") if "=" in kv)
+            pr = PROCS.get(q.get("id", ""))
+            return self.reply(pr.read(int(q.get("since", "0"))) if pr else {"error": "no such program"}, 200 if pr else 404)
         self.reply({"error": "not found"}, 404)
 
     def do_POST(self):
@@ -257,6 +380,30 @@ class Handler(SimpleHTTPRequestHandler):
             cmd = str(b.get("cmd", ""))
             code, out = run(["runuser", "-l", USER, "-c", cmd], timeout=int(b.get("timeout", 30)))
             return self.reply({"code": code, "out": out[-200_000:]})
+        if p == "/api/proc/start":
+            lang = b.get("lang")
+            if lang not in LANGS:
+                return self.reply({"error": "unknown language"}, 400)
+            if not has_tool(LANGS[lang]["needs"]):
+                return self.reply({"error": f"{LANGS[lang]['name']} is not installed on this system"}, 400)
+            reap()
+            try:
+                pr = Proc(lang, str(b.get("code", "")))
+            except Exception as e:  # e.g. the desktop user is missing
+                return self.reply({"error": f"could not start program: {e}"}, 500)
+            pid = secrets.token_hex(8)
+            PROCS[pid] = pr
+            return self.reply({"id": pid})
+        if p == "/api/proc/write":
+            pr = PROCS.get(b.get("id"))
+            if pr:
+                pr.write(str(b.get("data", "")))
+            return self.reply({"ok": bool(pr)})
+        if p == "/api/proc/kill":
+            pr = PROCS.get(b.get("id"))
+            if pr:
+                pr.kill()
+            return self.reply({"ok": bool(pr)})
         self.reply({"error": "not found"}, 404)
 
 

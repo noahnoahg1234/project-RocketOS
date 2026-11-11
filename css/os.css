@@ -427,3 +427,18 @@ body[data-taskbar="classic"] .tray-clock .d { color: #333; } body[data-taskbar="
   .tl { display: none; } .task { max-width: 44px; } .start-label { display: none; }
   .fm-side, .set-nav, .help-nav, .st-side, .am-left { width: 120px; }
 }
+
+/* native (OS) browser */
+.br-progress { height: 2px; width: 0; background: var(--accent); transition: width .2s; flex: none; }
+.br-views.native { background: var(--win2); }
+.br-snap { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top left; }
+
+/* native program window / App Maker output terminal */
+.program { display: flex; flex-direction: column; height: 100%; background: #0f111a; color: #e6e6e6; }
+.prog-bar { display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: #181b26; color: #ccd; }
+.prog-out { flex: 1; overflow: auto; padding: 8px 10px; font: 13.5px/1.45 var(--mono); white-space: pre-wrap; word-break: break-word; user-select: text; cursor: text; }
+.prog-echo { color: #9aedfe; }
+.prog-in { border: 0; border-top: 1px solid #ffffff18; background: #0b0d14; color: #e6e6e6; padding: 8px 10px; font: 13.5px var(--mono); outline: none; }
+.prog-in:disabled { opacity: .45; }
+.am-lang { max-width: 210px; }
+.am-out { flex: 1; display: flex; flex-direction: column; min-height: 0; }

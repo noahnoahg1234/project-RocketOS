@@ -1,0 +1,73 @@
+# Builds the bootable RocketOS ISO and publishes it as a GitHub Release,
+# so the README's "Download" button always points at the newest image:
+#   https://github.com/<owner>/<repo>/releases/latest/download/rocketos.iso
+#
+# Runs when you push a version tag (v1.2.0 → release "v1.2.0"), when RocketOS code changes on main
+# (→ rolling release "latest-build"), or on demand from the Actions tab ("Run workflow").
+name: Build & release RocketOS ISO
+
+on:
+  push:
+    tags: ["v*"]
+    branches: [main]
+    paths: ["os/**", "js/**", "css/**", "index.html", ".github/workflows/release.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rocketos-release
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space on the runner
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q debootstrap squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin mtools
+
+      - name: Build the ISO
+        run: sudo ./os/build.sh
+
+      - name: Check size and write checksum
+        working-directory: os/out
+        run: |
+          size=$(stat -c %s rocketos.iso)
+          echo "ISO size: $((size / 1048576)) MB"
+          # GitHub release files must be under 2 GiB
+          if [ "$size" -ge 2147483648 ]; then echo "::error::ISO is larger than 2 GiB; build with LANGS=0 or VARIANT=vm"; exit 1; fi
+          sha256sum rocketos.iso > rocketos.iso.sha256
+          cat rocketos.iso.sha256
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(sed -n "s/.*const version = '\(.*\)'.*/\1/p" js/core.js)
+          if [ "${GITHUB_REF_TYPE}" = tag ]; then
+            TAG="${GITHUB_REF_NAME}"; TITLE="RocketOS ${GITHUB_REF_NAME}"
+          else
+            TAG="latest-build"; TITLE="RocketOS ${VERSION} (latest build)"
+            gh release delete "$TAG" --cleanup-tag --yes 2>/dev/null || true
+          fi
+          cat > notes.md <<EOF
+          Bootable RocketOS ${VERSION} image (built from \`${GITHUB_SHA::7}\`).
+
+          **Install:** write \`rocketos.iso\` to a USB stick with [balenaEtcher](https://etcher.balena.io/) or Rufus (DD mode), then boot from it (BIOS or UEFI, Secure Boot off).
+          Or attach it to a virtual machine (VirtualBox / VMware / QEMU: "Ubuntu 64-bit", 3 GB RAM).
+
+          Check the download: \`sha256sum -c rocketos.iso.sha256\`
+          EOF
+          gh release create "$TAG" os/out/rocketos.iso os/out/rocketos.iso.sha256 \
+            --target "${GITHUB_SHA}" --title "$TITLE" --notes-file notes.md --latest
