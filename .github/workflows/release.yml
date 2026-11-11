@@ -3,13 +3,13 @@
 #   https://github.com/<owner>/<repo>/releases/latest/download/rocketos.iso
 #
 # Runs when you push a version tag (v1.2.0 → release "v1.2.0"), when RocketOS code changes on main
-# (→ rolling release "latest-build"), or on demand from the Actions tab ("Run workflow").
+# or on a claude/* work branch (→ rolling release "latest-build"), or on demand from the Actions tab.
 name: Build & release RocketOS ISO
 
 on:
   push:
     tags: ["v*"]
-    branches: [main]
+    branches: [main, "claude/**"]
     paths: ["os/**", "js/**", "css/**", "index.html", ".github/workflows/release.yml"]
   workflow_dispatch:
 
